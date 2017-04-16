@@ -20,7 +20,8 @@ import br.univel.jshare.comum.Cliente;
 import br.univel.jshare.comum.IServer;
 import br.univel.jshare.comum.TipoFiltro;
 import br.univel.jshare.modelos.ModeloArquivos;
-import br.univel.util.Tools;
+import br.univel.jshare.util.Tools;
+
 import java.awt.event.ActionListener;
 import java.rmi.NotBoundException;
 import java.rmi.RemoteException;
@@ -86,6 +87,7 @@ public class Principal extends JFrame implements IServer {
 	private JButton buttonBaixar;
 	private JTextField txfValorFiltro;
 	private int idArquivo;
+	private JButton buttonPublicar;
 
 	/**
 	 * Launch the application.
@@ -130,9 +132,9 @@ public class Principal extends JFrame implements IServer {
 		gbc_panel_1.gridy = 0;
 		contentPane.add(panel_1, gbc_panel_1);
 		GridBagLayout gbl_panel_1 = new GridBagLayout();
-		gbl_panel_1.columnWidths = new int[] { 0, 148, 0, 0, 0, 0, 0 };
+		gbl_panel_1.columnWidths = new int[] { 0, 148, 0, 0, 0, 0, 0, 0 };
 		gbl_panel_1.rowHeights = new int[] { 0, 0, 0 };
-		gbl_panel_1.columnWeights = new double[] { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, Double.MIN_VALUE };
+		gbl_panel_1.columnWeights = new double[] { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, Double.MIN_VALUE };
 		gbl_panel_1.rowWeights = new double[] { 0.0, 0.0, Double.MIN_VALUE };
 		panel_1.setLayout(gbl_panel_1);
 
@@ -235,20 +237,37 @@ public class Principal extends JFrame implements IServer {
 		buttonDesconectar = new JButton("Desconectar");
 		buttonDesconectar.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent arg0) {
-
 				if(cbServidor.isSelected()){
 					stopServer();
 				}else{
 					sair();																					
 				}
-
 			}
 		});
 		buttonDesconectar.setEnabled(false);
 		GridBagConstraints gbc_buttonDesconectar = new GridBagConstraints();
+		gbc_buttonDesconectar.insets = new Insets(0, 0, 0, 5);
 		gbc_buttonDesconectar.gridx = 5;
 		gbc_buttonDesconectar.gridy = 1;
 		panel_1.add(buttonDesconectar, gbc_buttonDesconectar);
+		
+		buttonPublicar = new JButton("Publicar");
+		buttonPublicar.addMouseListener(new MouseAdapter() {
+			@Override
+			public void mouseClicked(MouseEvent arg0) {
+				try {
+					servidor.publicarListaArquivos(cliente, meusArquivos());
+				} catch (RemoteException e) {
+					log("Erro ao publicar lista de arquivos!");
+					e.printStackTrace();
+				}
+			}
+		});
+		buttonPublicar.setEnabled(false);
+		GridBagConstraints gbc_buttonPublicar = new GridBagConstraints();
+		gbc_buttonPublicar.gridx = 6;
+		gbc_buttonPublicar.gridy = 1;
+		panel_1.add(buttonPublicar, gbc_buttonPublicar);
 
 		panel_3 = new JPanel();
 		GridBagConstraints gbc_panel_3 = new GridBagConstraints();
@@ -596,11 +615,11 @@ public class Principal extends JFrame implements IServer {
 		int intPorta = Integer.parseInt(strPorta);
 		String ipCliente = getIp();
 
-		cliente = new Cliente();
-		cliente.setId(9);
-		cliente.setIp(ipCliente);
-		cliente.setPorta(intPorta);
-		cliente.setNome(meunome);
+		this.cliente = new Cliente();
+		this.cliente.setId(9);
+		this.cliente.setIp(ipCliente);
+		this.cliente.setPorta(intPorta);
+		this.cliente.setNome(meunome);
 
 		log("Tentando conectar...");
 
@@ -609,8 +628,9 @@ public class Principal extends JFrame implements IServer {
 			servidor = (IServer) registry.lookup(IServer.NOME_SERVICO);
 			servidor.registrarCliente(cliente); 
 			log("Conectado com sucesso!");
-			servidor.publicarListaArquivos(cliente, meusArquivos());
 			configurarFields(true);
+			createFolders();
+			servidor.publicarListaArquivos(cliente, meusArquivos());
 		} catch (RemoteException e) {
 			log("Problemas ao conectar!");
 			e.printStackTrace();
@@ -641,6 +661,7 @@ public class Principal extends JFrame implements IServer {
 			buttonBaixar.setEnabled(true);
 			buttonConectar.setEnabled(false);
 			buttonDesconectar.setEnabled(true);
+			buttonPublicar.setEnabled(true);
 			cbFiltro.setEnabled(true);
 			cbServidor.setEnabled(false);
 		}else{
@@ -652,6 +673,7 @@ public class Principal extends JFrame implements IServer {
 			buttonBaixar.setEnabled(false);
 			buttonConectar.setEnabled(true);
 			buttonDesconectar.setEnabled(false);
+			buttonPublicar.setEnabled(false);
 			cbFiltro.setEnabled(false);
 			cbServidor.setEnabled(true);
 			mapaArquivos.clear();
@@ -660,10 +682,29 @@ public class Principal extends JFrame implements IServer {
 			table.setModel(modeloArquivos);
 		}
 	}
+	
+	public void createFolders(){
+
+		String currentFolder = new File("").getAbsolutePath();
+		File dirUploads = new File(currentFolder + "\\Share\\Uploads");
+		File dirDownloads = new File(currentFolder + "\\Share\\Downloads");
+		
+		if (!dirUploads.exists()) {
+			log("Diretorio criado em "+ currentFolder + "\\Share\\Uploads");
+			dirUploads.mkdirs(); 
+		}
+		
+		if (!dirDownloads.exists()) {
+			log("Diretorio criado em "+ currentFolder + "\\Share\\Downloads");
+			dirDownloads.mkdirs(); 
+		}
+		
+	}
 
 	public List<Arquivo> meusArquivos() {
 
-		File dir = new File(path + "\\Share\\Uploads");
+		File dir = new File(new File("").getAbsolutePath() + "\\Share\\Uploads");
+		
 		List<Arquivo> listaArquivos = new ArrayList<>();
 
 		for (File file : dir.listFiles()) {
@@ -682,7 +723,7 @@ public class Principal extends JFrame implements IServer {
 		}
 
 		if(listaArquivos.isEmpty()){
-			log("Nenhum arquivo encontrado!");
+			log("Nenhum arquivo encontrado para publicar!");
 		}else{
 			log("Lista de arquivos publicados!");
 		}
@@ -726,8 +767,8 @@ public class Principal extends JFrame implements IServer {
 			public void run() {
 				try {
 					Registry registryCliente = LocateRegistry.getRegistry(ip, porta);
-					IServer server = (IServer) registryCliente.lookup(IServer.NOME_SERVICO);	
-					File file = new File(path + "\\Share\\Downloads\\" + arquivo.getNome() + "." + arquivo.getExtensao());		 			
+					IServer server = (IServer) registryCliente.lookup(IServer.NOME_SERVICO);
+					File file = new File(new File("").getAbsolutePath() + "\\Share\\Downloads\\" + arquivo.getNome() + "." + arquivo.getExtensao());
 					FileOutputStream in = new FileOutputStream(file);		 			
 					in.write(server.baixarArquivo(cliente, arquivo));		 			
 					in.close();		 								

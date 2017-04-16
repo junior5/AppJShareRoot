@@ -1,4 +1,4 @@
-package br.univel.util;
+package br.univel.jshare.util;
 
 import java.io.FileInputStream;
 import java.io.InputStream;
