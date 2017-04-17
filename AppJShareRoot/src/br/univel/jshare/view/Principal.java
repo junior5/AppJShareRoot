@@ -14,14 +14,12 @@ import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import javax.swing.border.EmptyBorder;
 import javax.swing.text.DefaultCaret;
-
 import br.univel.jshare.comum.Arquivo;
 import br.univel.jshare.comum.Cliente;
 import br.univel.jshare.comum.IServer;
 import br.univel.jshare.comum.TipoFiltro;
 import br.univel.jshare.modelos.ModeloArquivos;
 import br.univel.jshare.util.Tools;
-
 import java.awt.event.ActionListener;
 import java.rmi.NotBoundException;
 import java.rmi.RemoteException;
@@ -71,13 +69,11 @@ public class Principal extends JFrame implements IServer {
 	private Map<String, Cliente> mapaClientes = new HashMap<>();
 	private Map<Cliente, List<Arquivo>> mapaArquivos = new HashMap<Cliente, List<Arquivo>>();
 	private ModeloArquivos modeloArquivos = new ModeloArquivos(mapaArquivos);
-	private String path = System.getProperty("user.dir");
 	private Registry registry;
 	private JTextArea taLog;
 	private JPanel panel_2;
 	private JScrollPane scrollPane;
 	private JTable table;
-	private String meunome;
 	private JCheckBox cbServidor;
 	private JPanel panel_3;
 	private JLabel lblDiretrio;
@@ -440,9 +436,9 @@ public class Principal extends JFrame implements IServer {
 	@Override
 	public Map<Cliente, List<Arquivo>> procurarArquivo(String query, TipoFiltro tipoFiltro, String filtro) throws RemoteException {
 
-		List<Arquivo> resultArqs = new ArrayList<>();
+		List<Arquivo> arquivosEncontrados = new ArrayList<>();
 
-		HashMap<Cliente, List<Arquivo>> resultSearch = new HashMap<>();
+		HashMap<Cliente, List<Arquivo>> result = new HashMap<>();
 
 		Pattern patern = Pattern.compile(".*" + query + ".*");
 
@@ -455,26 +451,26 @@ public class Principal extends JFrame implements IServer {
 				switch (tipoFiltro) {
 					case NOME:
 						if (arq.getNome().contains(query)) {
-							resultArqs.add(arq);
+							arquivosEncontrados.add(arq);
 						}
 						break;
 					case TAMANHO_MIN:
 						if (arq.getTamanho() >= Integer.parseInt(filtro) && filtro != "") {
 							if (arq.getNome().contains(query)) {
-								resultArqs.add(arq);
+								arquivosEncontrados.add(arq);
 							}
 						}
 						break;
 					case TAMANHO_MAX:
 						if (arq.getTamanho() <= Integer.parseInt(filtro) && filtro != "") {
 							if (arq.getNome().contains(query)) {
-								resultArqs.add(arq);
+								arquivosEncontrados.add(arq);
 							}
 						}
 						break;
 					case EXTENSAO:
 						if (arq.getExtensao().equals(filtro)) {
-							resultArqs.add(arq);
+							arquivosEncontrados.add(arq);
 						}
 						break;
 					default:
@@ -484,16 +480,16 @@ public class Principal extends JFrame implements IServer {
 
 			}
 
-			resultSearch.put(client, resultArqs);
+			result.put(client, arquivosEncontrados);
 		}
 
-		return resultSearch;
+		return result;
 	}
 
 	@Override
 	public byte[] baixarArquivo(Cliente cli, Arquivo arq) throws RemoteException {
 
-		log("O cliente " + cli.getNome() + " fez o download do arquivo "+'"'+arq.getNome()+"."+arq.getExtensao()+'"');
+		log("O cliente " + cli.getNome() + " fez o download do arquivo " + '"' + arq.getNome()  +"." + arq.getExtensao() + '"');
 		
 		byte[] arquivo = null;
 		Path path = Paths.get(arq.getPath());
@@ -588,9 +584,10 @@ public class Principal extends JFrame implements IServer {
 
 	public void conectar(){
 
-		meunome = txfMeuNome.getText().trim();
-
-		if (meunome.length() == 0) {
+		String nomeCliente = txfMeuNome.getText().trim();
+		String ipCliente = getIp();
+		
+		if (nomeCliente.length() == 0) {
 			JOptionPane.showMessageDialog(this, "Você precisa digitar um nome!");
 			txfMeuNome.requestFocus();
 			return;
@@ -613,13 +610,13 @@ public class Principal extends JFrame implements IServer {
 		}
 
 		int intPorta = Integer.parseInt(strPorta);
-		String ipCliente = getIp();
+		
 
 		this.cliente = new Cliente();
 		this.cliente.setId(9);
 		this.cliente.setIp(ipCliente);
 		this.cliente.setPorta(intPorta);
-		this.cliente.setNome(meunome);
+		this.cliente.setNome(nomeCliente);
 
 		log("Tentando conectar...");
 
@@ -762,23 +759,34 @@ public class Principal extends JFrame implements IServer {
 		arquivo.setTamanho(Long.parseLong(table.getValueAt(table.getSelectedRow(), 5).toString()));
 		arquivo.setPath(table.getValueAt(table.getSelectedRow(), 6).toString());
 		arquivo.setMd5(table.getValueAt(table.getSelectedRow(), 7).toString());
-
+		String diretorioArquivo = "\\Share\\Downloads\\Cópia de " + arquivo.getNome() + "." + arquivo.getExtensao();
+		
 		Thread t1 = new Thread(new Runnable() {
 			public void run() {
 				try {
+					
 					Registry registryCliente = LocateRegistry.getRegistry(ip, porta);
+					
 					IServer server = (IServer) registryCliente.lookup(IServer.NOME_SERVICO);
-					File file = new File(new File("").getAbsolutePath() + "\\Share\\Downloads\\" + arquivo.getNome() + "." + arquivo.getExtensao());
-					FileOutputStream in = new FileOutputStream(file);		 			
-					in.write(server.baixarArquivo(cliente, arquivo));		 			
+					
+					File file = new File(new File("").getAbsolutePath() + diretorioArquivo);
+					
+					FileOutputStream in = new FileOutputStream(file);	
+					
+					log("Realizando o download do arquivo: " + arquivo.getNome() + "." + arquivo.getExtensao());
+
+					in.write(server.baixarArquivo(cliente, arquivo));	
+					
 					in.close();		 								
-					log("Realizando o downlaod do arquivo: " + arquivo.getNome() + "." + arquivo.getExtensao());	
+					
 					String md5 = new Tools().getMD5Checksum(file.getPath());
+					
 					if(md5.equals(arquivo.getMd5())){
 						log("A integridade do arquivo está correta!");
 					}else{
 						log("Arquivo corrompido!");
 					}
+					
 				} catch (RemoteException e) {
 					log("Erro ao iniciar download do arquivo.");
 					e.printStackTrace();
